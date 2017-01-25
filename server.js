@@ -209,8 +209,8 @@ app.get("/logout",(req,res)=>{
 });
 
 ///static/js/main.2cf20ec8.js
-app.get("/static/js/main.efa10c2c.js",(req,res)=>{
-   res.sendFile("main.efa10c2c.js",{root: __dirname+"/build/static/js/" }); 
+app.get("/static/js/main.75df1062.js",(req,res)=>{
+   res.sendFile("main.75df1062.js",{root: __dirname+"/build/static/js/" }); 
 });
 ///static/css/main.a8962cf1.css
 app.get("/static/css/main.a8962cf1.css",(req,res)=>{

@@ -1,8 +1,6 @@
 var express = require("express");
 var app = express();
 var session = require("express-session");
-//var cur_session={};
-//var router = express.Router();
 var bodyParser = require('body-parser');
 
 var mongo = require("mongodb").MongoClient;
@@ -35,7 +33,7 @@ app.get("/polls",(req,res)=>{
 });
 
 app.get("/loggedin",(req,res)=>{
-    if(req.session!==undefined){ console.log(req.session.uid); res.send(req.session.uid); }
+    if(req.session!==undefined){ res.send(req.session.uid); }
     else { res.send(null); }
 });
 
@@ -159,7 +157,7 @@ app.post("/login",(req,res)=>{
         col.findOne({ userName:userName, password:userPass },(err,doc)=>{
            if(err){ throw err; }    
            db.close();
-           if(doc!==null){ cur_session.uid = doc.userName; console.log(cur_session.uid); res.send("success"); return; }
+           if(doc!==null){ cur_session.uid = doc.userName; res.send("success"); return; }
            res.send("fail");
         });
       });
@@ -207,14 +205,12 @@ app.post("/newUser",(req,res)=>{
 
 app.get("/logout",(req,res)=>{
    req.session.destroy();
-   //cur_session = req.session;
-   //cur_session.uid= null;
    res.send("done");
 });
 
 ///static/js/main.2cf20ec8.js
-app.get("/static/js/main.2cf20ec8.js",(req,res)=>{
-   res.sendFile("main.2cf20ec8.js",{root: __dirname+"/build/static/js/" }); 
+app.get("/static/js/main.901773c6.js",(req,res)=>{
+   res.sendFile("main.901773c6.js",{root: __dirname+"/build/static/js/" }); 
 });
 ///static/css/main.a8962cf1.css
 app.get("/static/css/main.a8962cf1.css",(req,res)=>{

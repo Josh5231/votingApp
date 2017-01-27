@@ -1,12 +1,12 @@
 # Voting App
 
 Voting App
-ver 1.0.1
+ver 1.0.2
 By: Josh Sanders
 
 http://the-poll-it.herokuapp.com/
 
-Last updated: 1/26/17
+Last updated: 1/27/17
 
 Made for FreeCodeCamp's curriculum. User stories:
 

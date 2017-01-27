@@ -5,10 +5,50 @@ var bodyParser = require('body-parser');
 var mongo = require("mongodb").MongoClient;
 var mongoURL = process.env.MONGOLAB_URI;
 
-var router = express.Router()
+var router = express.Router();
+
+var attemps = 0;
+
+var DB = null;
+var userCol = null;
+var pollCol = null;
+
+var startUp = ()=> {
+mongo.connect(mongoURL,(err,db)=>{
+ if(err){ 
+     attemps++;
+     console.log("Error on attemp #"+attemps+" : "+err);
+     if(attemps<4){ setTimeout(startUp(),500); return; }
+     else { throw err; }
+    }
+ else { 
+     DB = db;
+     userCol = DB.collection("users");
+     pollCol = DB.collection("polls");
+     console.log("DB Connected");
+     return;
+     }
+     
+});
+};
+
+startUp();
 
 
 //Grab all the current polls from the DB
+
+router.get("/polls",(req,res)=>{
+     if(DB!=null){
+        pollCol.find().toArray((err,data)=>{
+           if(err){ throw err; }
+           res.send(data);
+           return;
+        });
+     }
+     else { console.log("DB not ready"); res.send("DB not ready"); return; }
+}); 
+
+/*
 router.get("/polls",(req,res)=>{
      mongo.connect(mongoURL, (err, db)=>{
         if(err){ throw err; }
@@ -20,7 +60,7 @@ router.get("/polls",(req,res)=>{
            return;
         });
      });
-});
+}); */
 
 router.get("/loggedin",(req,res)=>{
     if(req.session!==undefined){ res.send(req.session.uid); }
@@ -29,6 +69,19 @@ router.get("/loggedin",(req,res)=>{
 
 //Submit and save a vote
 router.post("/vote",(req,res)=>{
+   var data = req.body;
+    if(DB!=null){
+        pollCol.find( { id:data.id } ).toArray((err,docs)=>{
+           if(err){ throw err; }
+           var temp = docs[0];
+           temp.options[data.opt].votes+=1;
+           pollCol.updateOne({ id:data.id},temp);
+           return;
+        });
+    }
+    else { console.log("DB not ready"); res.send("DB not ready"); return; }
+});
+/* router.post("/vote",(req,res)=>{
    var data = req.body;
    mongo.connect(mongoURL, (err, db)=>{
         if(err){ throw err; }
@@ -42,9 +95,23 @@ router.post("/vote",(req,res)=>{
            return;
         });
    });
-});
+}); */
 
 router.post("/addopt",(req,res)=>{
+   var data = req.body;
+    if(DB!==null){
+       pollCol.find( { id:data.id } ).toArray((err,docs)=>{
+           if(err){ res.send(err); return; }
+           var temp = docs[0];
+           temp.options.push({ opt:data.opt, votes:0 });
+           pollCol.updateOne({ id:data.id},temp).then(()=>{ res.send("success"); });
+           return;
+        });
+    }
+    else { console.log("DB not ready"); res.send("DB not ready"); return; }
+});
+
+/* router.post("/addopt",(req,res)=>{
    var data = req.body;
    mongo.connect(mongoURL, (err, db)=>{
        if(err){ throw err; }
@@ -58,9 +125,26 @@ router.post("/addopt",(req,res)=>{
            return;
         });
    });
-});
+}); */
 
 router.post("/userPoll",(req,res)=>{
+   var data=req.body;
+   if(DB!==null) {
+       userCol.find({ userName:data.userName }).toArray((err,docs)=>{
+          if(err){ throw err; }
+          if(docs.length<1){ res.send("error"); return; }
+          docs[0].polls.push(data.pollID);
+          userCol.replaceOne({ userName:data.userName },docs[0],(err,docs)=>{
+             if(err){ throw err; }
+             res.send("success");
+             return;
+          });
+       });
+   }
+    else { console.log("DB not ready"); res.send("DB not ready"); return; }
+});
+
+/* router.post("/userPoll",(req,res)=>{
    var data=req.body;
    mongo.connect(mongoURL,(err,db)=>{
        if(err){ throw err; }
@@ -77,8 +161,108 @@ router.post("/userPoll",(req,res)=>{
           });
        });
    });
+}); */
+
+router.post("/getUserPolls",(req,res)=>{
+   var data = req.body;
+    if(DB!==null){
+       userCol.findOne({ userName:data.userName },(err,doc)=>{
+          if(err){ throw err; }
+          res.send(doc.polls);
+          return;
+       });
+    }
+    else { console.log("DB not ready"); res.send("DB not ready"); return; }
 });
 
+router.post("/remove",(req,res)=>{
+   var data = req.body;
+   if(DB!==null){
+      pollCol.removeOne({ id:data.pollID },(err,doc)=>{
+          if(err){ throw err; }
+          userCol.findOne({ userName:data.userName },(err,doc2)=>{
+             if(err){ throw err; }
+             var out=doc2;
+             out.polls=doc2.polls.filter((cv)=>{ return cv!==data.pollID; });
+             userCol.replaceOne({ userName:data.userName},out,(err,r)=>{
+                if(err){ throw err; }
+                res.send("success");
+                return;
+             });
+          });
+      });
+   }
+   else { console.log("DB not ready"); res.send("DB not ready"); return; }
+});
+
+router.post("/submitpoll",(req,res)=>{
+   var data = req.body;
+   data.options=data.options.map((cv)=>{ return { opt:cv.opt, votes:0  }; });
+   if(DB!==null){
+      pollCol.insertOne(data,(err,d)=>{
+         if(err){ throw err; }
+         res.send(data.id);
+         return;
+      });
+   }
+    else { console.log("DB not ready"); res.send("DB not ready"); return; }
+});
+
+router.post("/login",(req,res)=>{
+    var cur_session = req.session;
+    var userName = req.body.userName;
+    var userPass = req.body.password;
+    if(DB!==null){
+        userCol.findOne({ userName:userName, password:userPass },(err,doc)=>{
+           if(err){ throw err; }
+           if(doc!==null){ cur_session.uid = doc.userName; res.send("success"); return; }
+           res.send("fail");
+           return;
+        });
+      }
+    else { console.log("DB not ready"); res.send("DB not ready"); return; }
+}); 
+
+router.post("/newUser",(req,res)=>{
+    var userName = req.body.userName;
+    var userPass = req.body.userPass;
+    var userEmail = req.body.Email;
+    if(DB!==null){
+        //1. Check if userName is already taken
+        
+        userCol.find({ userName:userName }).toArray((err,doc)=>{
+           if(err){ throw err; }
+           if(doc.length>0){ console.log("Name error"); res.send("errorUser"); return; }
+           
+                   
+            //2. Check if Email is already being used
+            userCol.find({ Email:userEmail }).toArray((err2,doc2)=>{
+                if(err2){ throw err2; }
+                if(doc2.length>0){ console.log("email error"); res.send("errorEmail"); return; }
+        
+             //3. Setup user object
+            var out = {
+            userName:userName,
+            password:userPass,
+            Email:userEmail,
+            polls:[],
+            type:"user"
+            };
+        
+                //4. Add new user to DB
+            userCol.insert(out,(err3)=>{
+                if(err3){ throw err3; }
+                res.send("success");
+                return;
+            });            });
+        });
+        
+      }
+    else { console.log("DB not ready"); res.send("DB not ready"); return; }
+});
+
+
+/*
 router.post("/getUserPolls",(req,res)=>{
    var data = req.body;
     mongo.connect(mongoURL,(err,db)=>{
@@ -191,11 +375,13 @@ router.post("/newUser",(req,res)=>{
         
       });
 });
+*/
 
 router.get("/logout",(req,res)=>{
    req.session.destroy();
    res.send("done");
 });
+
 
 router.get("/",(req,res)=>{
    res.sendFile("index.html",{root: __dirname+"/build/" }); 

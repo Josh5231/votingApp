@@ -3,9 +3,6 @@ var app = express();
 var session = require("express-session");
 var bodyParser = require('body-parser');
 
-var mongo = require("mongodb").MongoClient;
-var mongoURL = process.env.MONGOLAB_URI;
-
 var routes = require("./routes.js");
 
 var port = process.env.PORT || 8080;
